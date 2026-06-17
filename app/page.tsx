@@ -1,6 +1,7 @@
 import { Activity, Clock3, MapPin, RadioTower, Satellite } from "lucide-react";
 import Link from "next/link";
 
+import { MissionMap } from "@/components/mission-map";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -23,7 +24,6 @@ import {
 import {
   buildMissionControlData,
   mapPoint,
-  mapPolyline,
   mapSegments,
 } from "@/lib/orbit";
 import {
@@ -166,72 +166,12 @@ export default async function Home({ searchParams }: HomeProps) {
               </CardAction>
             </CardHeader>
             <CardContent className="pt-4">
-              <div className="relative aspect-2/1 overflow-hidden rounded-md border bg-muted">
-                <div
-                  className="absolute inset-0 bg-cover bg-center"
-                  style={{
-                    backgroundImage: "url('/maps/world-contour-hires.bmp')",
-                  }}
-                />
-                <svg
-                  className="absolute inset-0 size-full"
-                  viewBox="0 0 1440 720"
-                  aria-label="Satellite ground track and footprint"
-                  role="img"
-                >
-                  {footprintSegments.map((segment, index) => (
-                    <polygon
-                      key={`footprint-${index}`}
-                      points={mapPolyline(segment)}
-                      fill="rgba(34, 197, 94, 0.20)"
-                      stroke="rgb(34, 197, 94)"
-                      strokeWidth="2"
-                    />
-                  ))}
-                  {groundTrackSegments.map((segment, index) => (
-                    <polyline
-                      key={`track-${index}`}
-                      points={mapPolyline(segment)}
-                      fill="none"
-                      stroke="rgb(56, 189, 248)"
-                      strokeDasharray="10 8"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="4"
-                    />
-                  ))}
-                  <circle
-                    cx={observerPoint.x}
-                    cy={observerPoint.y}
-                    r="7"
-                    fill="rgb(250, 204, 21)"
-                    stroke="rgb(24, 24, 27)"
-                    strokeWidth="3"
-                  />
-                  <circle
-                    cx={data.current.x}
-                    cy={data.current.y}
-                    r="9"
-                    fill="rgb(239, 68, 68)"
-                    stroke="white"
-                    strokeWidth="4"
-                  />
-                </svg>
-              </div>
-              <div className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
-                <div className="flex items-center gap-2">
-                  <span className="size-3 rounded-full bg-red-500" />
-                  Satellite position
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="size-3 rounded-full bg-sky-400" />
-                  Ground track
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="size-3 rounded-full bg-green-500" />
-                  Footprint horizon
-                </div>
-              </div>
+              <MissionMap
+                currentPoint={data.current}
+                footprintSegments={footprintSegments}
+                groundTrackSegments={groundTrackSegments}
+                observerPoint={observerPoint}
+              />
             </CardContent>
           </Card>
 
@@ -371,13 +311,13 @@ export default async function Home({ searchParams }: HomeProps) {
           </Card>
         </div>
 
-          <Card className="rounded-lg">
-            <CardHeader>
-              <CardTitle>TLE Source</CardTitle>
-              <CardDescription>
-                Latest orbital data for the selected satellite from SatNOGS DB
-              </CardDescription>
-            </CardHeader>
+        <Card className="rounded-lg">
+          <CardHeader>
+            <CardTitle>TLE Source</CardTitle>
+            <CardDescription>
+              Latest orbital data for the selected satellite from SatNOGS DB
+            </CardDescription>
+          </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-3 text-sm md:grid-cols-4">
               <Metric label="Satellite" value={data.tle.name} />

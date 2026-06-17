@@ -66,23 +66,42 @@ App gọi SatNOGS DB theo `sat_id`:
 https://db.satnogs.org/api/tle/?sat_id=<SATNOGS_SAT_ID>
 ```
 
-Response từ SatNOGS là một mảng JSON. Phần tử đầu tiên là bộ TLE mới nhất:
+Ví dụ với vệ tinh mẫu đầu tiên trong `SATELLITE_CATALOG`, app gọi:
+
+```txt
+https://db.satnogs.org/api/tle/?sat_id=ABEW-7076-2438-2471-3995
+```
+
+Response từ SatNOGS là một mảng JSON. Phần tử đầu tiên là bộ TLE mới nhất. Đây là response
+mẫu đã dùng để kiểm tra format API:
 
 ```json
 [
   {
-    "tle0": "0 OBJECT NAME",
-    "tle1": "1 ...",
-    "tle2": "2 ...",
+    "tle0": "0 OBJECT D",
+    "tle1": "1 49398U 21102D   26168.05377890  .00009402  00000-0  31989-3 0  9999",
+    "tle2": "2 49398  97.3189 210.2672 0008635 193.2732 166.8284 15.30608614254001",
     "tle_source": "Space-Track.org",
-    "sat_id": "SATNOGS-SATELLITE-ID",
-    "norad_cat_id": 12345,
+    "sat_id": "ABEW-7076-2438-2471-3995",
+    "norad_cat_id": 99515,
     "updated": "2026-06-17T09:29:54.955778+0000"
   }
 ]
 ```
 
-## Giải Thích Field TLE Từ SatNOGS
+## Giải Thích Từng Giá Trị Trong Response SatNOGS Mẫu
+
+| Field | Value mẫu | Giải thích value này nghĩa là gì |
+| --- | --- | --- |
+| `tle0` | `0 OBJECT D` | Dòng tên/title của bộ TLE. Ký tự `0` là prefix dòng title theo format 3-line TLE. `OBJECT D` là tên object do nguồn TLE/SatNOGS trả về; nó có thể là tên generic, nên UI không nên phụ thuộc hoàn toàn vào field này để đặt tên hiển thị. |
+| `tle1` | `1 49398U 21102D   26168.05377890  .00009402  00000-0  31989-3 0  9999` | Dòng 1 của TLE, là input bắt buộc cho SGP4. Dòng này chứa mã object trong TLE (`49398U`), international designator (`21102D`), epoch TLE (`26168.05377890`), các hệ số liên quan mean motion/drag như `.00009402`, `00000-0`, `31989-3`, ephemeris type `0`, element set/checksum ở cuối. Không tự parse thủ công để tính quỹ đạo; truyền nguyên dòng này vào SGP4. |
+| `tle2` | `2 49398  97.3189 210.2672 0008635 193.2732 166.8284 15.30608614254001` | Dòng 2 của TLE, cũng là input bắt buộc cho SGP4. Dòng này chứa inclination `97.3189°`, RAAN `210.2672°`, eccentricity `0008635` nghĩa là `0.0008635`, argument of perigee `193.2732°`, mean anomaly `166.8284°`, mean motion `15.30608614` vòng/ngày, và revolution/checksum ở cuối. |
+| `tle_source` | `Space-Track.org` | Nguồn gốc bộ TLE mà SatNOGS đang dùng. Nghĩa là SatNOGS lấy/đồng bộ TLE này từ Space-Track. |
+| `sat_id` | `ABEW-7076-2438-2471-3995` | UUID của vệ tinh/object trong SatNOGS DB. Đây là key app nên dùng để gọi API vì ổn định theo SatNOGS. |
+| `norad_cat_id` | `99515` | Field NORAD catalog mà SatNOGS trả về cho record này. Trong ví dụ này nó khác số `49398` nằm trong TLE line, nên app không dùng field này làm key chính. |
+| `updated` | `2026-06-17T09:29:54.955778+0000` | Thời điểm SatNOGS cập nhật record TLE này. `+0000` nghĩa là UTC. Dùng để biết TLE mới hay cũ, không phải thời điểm hiện tại của vệ tinh. |
+
+## Giải Thích Field TLE Từ SatNOGS Theo Schema Chung
 
 | Field | Kiểu | Giải thích |
 | --- | --- | --- |
