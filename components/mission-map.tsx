@@ -1,7 +1,7 @@
 "use client";
 
 import { Minus, Plus } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 
@@ -29,17 +29,95 @@ export function MissionMap({
   groundTrackSegments,
   observerPoint,
 }: MissionMapProps) {
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{
+    pointerId: number;
+    startPan: MapPoint;
+    startX: number;
+    startY: number;
+  } | null>(null);
   const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState<MapPoint>({ x: 0, y: 0 });
   const zoomLabel = useMemo(() => `${Math.round(zoom * 100)}%`, [zoom]);
+
+  function clampPan(nextPan: MapPoint, nextZoom = zoom) {
+    const viewport = viewportRef.current;
+
+    if (!viewport || nextZoom <= 1) {
+      return { x: 0, y: 0 };
+    }
+
+    const bounds = viewport.getBoundingClientRect();
+    const maxX = ((nextZoom - 1) * bounds.width) / 2;
+    const maxY = ((nextZoom - 1) * bounds.height) / 2;
+
+    return {
+      x: Math.min(maxX, Math.max(-maxX, nextPan.x)),
+      y: Math.min(maxY, Math.max(-maxY, nextPan.y)),
+    };
+  }
+
+  function updateZoom(nextZoom: number) {
+    const clampedZoom = Math.min(3, Math.max(1, nextZoom));
+
+    setZoom(clampedZoom);
+    setPan((value) => clampPan(value, clampedZoom));
+  }
 
   return (
     <div className="space-y-3">
-      <div className="relative aspect-2/1 overflow-auto rounded-md border bg-muted">
+      <div
+        className="relative aspect-2/1 touch-none overflow-hidden rounded-md border bg-muted"
+        onPointerCancel={(event) => {
+          if (dragRef.current?.pointerId === event.pointerId) {
+            dragRef.current = null;
+          }
+        }}
+        onPointerDown={(event) => {
+          if (zoom <= 1 || event.button !== 0) {
+            return;
+          }
+
+          const target = event.target as HTMLElement;
+
+          if (target.closest("button")) {
+            return;
+          }
+
+          event.currentTarget.setPointerCapture(event.pointerId);
+          dragRef.current = {
+            pointerId: event.pointerId,
+            startPan: pan,
+            startX: event.clientX,
+            startY: event.clientY,
+          };
+        }}
+        onPointerMove={(event) => {
+          const drag = dragRef.current;
+
+          if (!drag || drag.pointerId !== event.pointerId) {
+            return;
+          }
+
+          setPan(
+            clampPan({
+              x: drag.startPan.x + event.clientX - drag.startX,
+              y: drag.startPan.y + event.clientY - drag.startY,
+            })
+          );
+        }}
+        onPointerUp={(event) => {
+          if (dragRef.current?.pointerId === event.pointerId) {
+            dragRef.current = null;
+          }
+        }}
+        ref={viewportRef}
+      >
         <div className="absolute right-3 top-3 z-10 flex items-center gap-1 rounded-lg border bg-background/90 p-1 shadow-sm backdrop-blur">
           <Button
             aria-label="Zoom out"
             disabled={zoom <= 1}
-            onClick={() => setZoom((value) => Math.max(1, value - 0.25))}
+            onClick={() => updateZoom(zoom - 0.25)}
             size="icon-sm"
             type="button"
             variant="outline"
@@ -52,7 +130,7 @@ export function MissionMap({
           <Button
             aria-label="Zoom in"
             disabled={zoom >= 3}
-            onClick={() => setZoom((value) => Math.min(3, value + 0.25))}
+            onClick={() => updateZoom(zoom + 0.25)}
             size="icon-sm"
             type="button"
             variant="outline"
@@ -62,10 +140,10 @@ export function MissionMap({
         </div>
 
         <div
-          className="relative"
+          className={zoom > 1 ? "absolute inset-0 cursor-grab active:cursor-grabbing" : "absolute inset-0"}
           style={{
-            height: `${zoom * 100}%`,
-            width: `${zoom * 100}%`,
+            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+            transformOrigin: "center",
           }}
         >
           <div
