@@ -1,3 +1,16 @@
+export type SatelliteConfig = {
+  satId: string;
+  name: string;
+  country?: string;
+  fallbackTle?: {
+    line1: string;
+    line2: string;
+    source: string;
+    noradCatId: number | null;
+    updatedAt: string;
+  };
+};
+
 export type TleRecord = {
   name: string;
   line1: string;
@@ -19,25 +32,43 @@ type SatnogsTleResponse = {
   updated?: string;
 };
 
-export const NANODRAGON_SAT_ID = "ABEW-7076-2438-2471-3995";
-export const SATNOGS_TLE_URL = `https://db.satnogs.org/api/tle/?sat_id=${NANODRAGON_SAT_ID}`;
+export const SATELLITE_CATALOG: SatelliteConfig[] = [
+  {
+    satId: "ABEW-7076-2438-2471-3995",
+    name: "Vietnam Satellite 1",
+    country: "Vietnam",
+    fallbackTle: {
+      line1:
+        "1 49398U 21102D   26168.05377890  .00009402  00000-0  31989-3 0  9999",
+      line2:
+        "2 49398  97.3189 210.2672 0008635 193.2732 166.8284 15.30608614254001",
+      source: "Space-Track.org via SatNOGS fallback",
+      noradCatId: 99515,
+      updatedAt: "2026-06-17T09:29:54.955778+0000",
+    },
+  },
+];
 
-const FALLBACK_TLE: TleRecord = {
-  name: "NanoDragon",
-  line1:
-    "1 49398U 21102D   26168.05377890  .00009402  00000-0  31989-3 0  9999",
-  line2:
-    "2 49398  97.3189 210.2672 0008635 193.2732 166.8284 15.30608614254001",
-  source: "Space-Track.org via SatNOGS fallback",
-  satId: NANODRAGON_SAT_ID,
-  noradCatId: 99515,
-  updatedAt: "2026-06-17T09:29:54.955778+0000",
-  isFallback: true,
-};
+export const DEFAULT_SATELLITE_ID = SATELLITE_CATALOG[0].satId;
 
-export async function fetchNanoDragonTle(): Promise<TleRecord> {
+export function getSatnogsTleUrl(satId: string) {
+  return `https://db.satnogs.org/api/tle/?sat_id=${encodeURIComponent(satId)}`;
+}
+
+export function getSatelliteConfig(satId = DEFAULT_SATELLITE_ID) {
+  return (
+    SATELLITE_CATALOG.find((satellite) => satellite.satId === satId) ??
+    SATELLITE_CATALOG[0]
+  );
+}
+
+export async function fetchSatelliteTle(
+  satId = DEFAULT_SATELLITE_ID
+): Promise<TleRecord> {
+  const satellite = getSatelliteConfig(satId);
+
   try {
-    const response = await fetch(SATNOGS_TLE_URL, {
+    const response = await fetch(getSatnogsTleUrl(satellite.satId), {
       cache: "no-store",
       headers: {
         Accept: "application/json",
@@ -56,16 +87,29 @@ export async function fetchNanoDragonTle(): Promise<TleRecord> {
     }
 
     return {
-      name: "NanoDragon",
+      name: satellite.name || tle.tle0?.replace(/^0\s+/, "").trim() || tle.sat_id || "Satellite",
       line1: tle.tle1,
       line2: tle.tle2,
       source: tle.tle_source || "SatNOGS",
-      satId: tle.sat_id || NANODRAGON_SAT_ID,
+      satId: tle.sat_id || satellite.satId,
       noradCatId: tle.norad_cat_id ?? null,
       updatedAt: tle.updated || new Date().toISOString(),
       isFallback: false,
     };
   } catch {
-    return FALLBACK_TLE;
+    if (!satellite.fallbackTle) {
+      throw new Error(`Unable to fetch TLE for satellite ${satellite.satId}`);
+    }
+
+    return {
+      name: satellite.name,
+      line1: satellite.fallbackTle.line1,
+      line2: satellite.fallbackTle.line2,
+      source: satellite.fallbackTle.source,
+      satId: satellite.satId,
+      noradCatId: satellite.fallbackTle.noradCatId,
+      updatedAt: satellite.fallbackTle.updatedAt,
+      isFallback: true,
+    };
   }
 }

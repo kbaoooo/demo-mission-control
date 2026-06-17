@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "NanoDragon Mission Control",
-  description: "SGP4 mission-control dashboard for Vietnam's NanoDragon satellite.",
+  title: "Satellite Mission Control",
+  description: "SGP4 mission-control dashboard for SatNOGS-tracked satellites.",
 };
 
 export default function RootLayout({

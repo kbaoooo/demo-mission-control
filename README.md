@@ -1,9 +1,9 @@
-# NanoDragon Mission Control
+# Satellite Mission Control
 
-Đây là dashboard Next.js để theo dõi vệ tinh **NanoDragon** của Việt Nam.
+Đây là dashboard Next.js để theo dõi **nhiều vệ tinh** lấy TLE từ SatNOGS.
 
-Ứng dụng lấy TLE mới nhất từ SatNOGS, dùng mô hình **SGP4** để tính vị trí vệ tinh,
-đường ground track, footprint và các lần bay qua ground station ở Hà Nội.
+Ứng dụng dùng TLE của vệ tinh được chọn, chạy mô hình **SGP4** để tính vị trí hiện tại,
+ground track, footprint và pass prediction theo ground station mặc định.
 
 ## Chạy Project
 
@@ -17,18 +17,53 @@ Mở dashboard:
 http://localhost:3000
 ```
 
+Chọn vệ tinh bằng query string:
+
+```txt
+http://localhost:3000?satId=<SATNOGS_SAT_ID>
+```
+
 API nội bộ:
 
 ```txt
-GET /api/nanodragon
+GET /api/satellites
+GET /api/satellites?satId=<SATNOGS_SAT_ID>
 ```
+
+## Cấu Hình Nhiều Vệ Tinh
+
+Danh sách vệ tinh nằm trong:
+
+```txt
+lib/satnogs.ts
+```
+
+Thêm vệ tinh mới bằng cách thêm một object vào `SATELLITE_CATALOG`:
+
+```ts
+{
+  satId: "SATNOGS-SATELLITE-ID",
+  name: "Display Name",
+  country: "Vietnam",
+  fallbackTle: {
+    line1: "1 ...",
+    line2: "2 ...",
+    source: "Space-Track.org via SatNOGS fallback",
+    noradCatId: 12345,
+    updatedAt: "2026-06-17T09:29:54.955778+0000",
+  },
+}
+```
+
+`fallbackTle` là optional. Nếu có fallback, dashboard vẫn render được khi SatNOGS tạm lỗi.
+Nếu không có fallback và SatNOGS lỗi, API sẽ trả lỗi.
 
 ## Nguồn TLE Từ SatNOGS
 
-App gọi API SatNOGS DB bằng SatNOGS satellite ID của NanoDragon:
+App gọi SatNOGS DB theo `sat_id`:
 
 ```txt
-https://db.satnogs.org/api/tle/?sat_id=ABEW-7076-2438-2471-3995
+https://db.satnogs.org/api/tle/?sat_id=<SATNOGS_SAT_ID>
 ```
 
 Response từ SatNOGS là một mảng JSON. Phần tử đầu tiên là bộ TLE mới nhất:
@@ -36,12 +71,12 @@ Response từ SatNOGS là một mảng JSON. Phần tử đầu tiên là bộ T
 ```json
 [
   {
-    "tle0": "0 OBJECT D",
-    "tle1": "1 49398U 21102D   26168.05377890  .00009402  00000-0  31989-3 0  9999",
-    "tle2": "2 49398  97.3189 210.2672 0008635 193.2732 166.8284 15.30608614254001",
+    "tle0": "0 OBJECT NAME",
+    "tle1": "1 ...",
+    "tle2": "2 ...",
     "tle_source": "Space-Track.org",
-    "sat_id": "ABEW-7076-2438-2471-3995",
-    "norad_cat_id": 99515,
+    "sat_id": "SATNOGS-SATELLITE-ID",
+    "norad_cat_id": 12345,
     "updated": "2026-06-17T09:29:54.955778+0000"
   }
 ]
@@ -51,22 +86,22 @@ Response từ SatNOGS là một mảng JSON. Phần tử đầu tiên là bộ T
 
 | Field | Kiểu | Giải thích |
 | --- | --- | --- |
-| `tle0` | `string` | Dòng tên/title của TLE. Thường bắt đầu bằng `0`. Với NanoDragon, SatNOGS có thể trả tên generic như `OBJECT D`, nên app tự normalize tên hiển thị thành `NanoDragon`. |
+| `tle0` | `string` | Dòng tên/title của TLE. Thường bắt đầu bằng `0`. Có thể là tên generic từ nguồn TLE, nên UI ưu tiên `name` trong `SATELLITE_CATALOG`. |
 | `tle1` | `string` | Dòng 1 của TLE. Đây là input bắt buộc cho SGP4. Dòng này chứa catalog number, classification, international designator, epoch, đạo hàm mean motion, B* drag term, ephemeris type, element set number và checksum. |
 | `tle2` | `string` | Dòng 2 của TLE. Đây cũng là input bắt buộc cho SGP4. Dòng này chứa inclination, RAAN, eccentricity, argument of perigee, mean anomaly, mean motion, revolution number và checksum. |
 | `tle_source` | `string` | Nguồn TLE mà SatNOGS đang dùng, ví dụ `Space-Track.org`. |
-| `sat_id` | `string` | UUID ổn định của vệ tinh trong SatNOGS. Với NanoDragon nên dùng field này để query: `ABEW-7076-2438-2471-3995`. |
-| `norad_cat_id` | `number` | Field NORAD catalog trong SatNOGS. Với NanoDragon hiện đang trả `99515`, trong khi TLE line lại chứa `49398`, nên không nên dùng field này làm lookup chính. |
+| `sat_id` | `string` | UUID ổn định của vệ tinh trong SatNOGS. App dùng field này làm lookup chính. |
+| `norad_cat_id` | `number` | Field NORAD catalog trong SatNOGS. Có thể khác với số xuất hiện trong TLE line tùy trạng thái object, nên không dùng làm lookup chính. |
 | `updated` | `string` | Thời điểm SatNOGS cập nhật record TLE. Đây là timestamp UTC có offset. |
 
-Điểm quan trọng: **app dùng `sat_id`, không dùng `norad_cat_id`, để lấy TLE NanoDragon**.
+Điểm quan trọng: **app dùng `sat_id`, không dùng `norad_cat_id`, để chọn vệ tinh**.
 
 ## Response API Nội Bộ
 
 Endpoint:
 
 ```txt
-GET /api/nanodragon
+GET /api/satellites?satId=<SATNOGS_SAT_ID>
 ```
 
 API này không trả raw SatNOGS response trực tiếp. Nó trả dữ liệu đã normalize và dữ liệu đã
@@ -93,14 +128,14 @@ type MissionControlData = {
 | Field | Kiểu | Giải thích |
 | --- | --- | --- |
 | `generatedAt` | `string` | Thời điểm API tạo response, dạng UTC ISO string. |
-| `tle` | `TleRecord` | TLE đã được normalize từ SatNOGS hoặc từ fallback nội bộ nếu SatNOGS lỗi. |
-| `observer` | `Observer` | Ground station dùng để tính look angle và pass prediction. Mặc định là Hà Nội. |
+| `tle` | `TleRecord` | TLE đã được normalize từ SatNOGS hoặc fallback nội bộ. |
+| `observer` | `Observer` | Ground station dùng để tính look angle và pass prediction. |
 | `current` | `GeoPoint` | Vị trí vệ tinh tại thời điểm `generatedAt`. |
 | `currentLook` | `LookPoint` | Góc nhìn hiện tại từ ground station đến vệ tinh: azimuth, elevation, range. |
 | `groundTrack` | `GeoPoint[]` | Đường đi trên mặt đất từ `now - 45 phút` đến `now + 90 phút`, step 2 phút. |
 | `prediction` | `GeoPoint[]` | Dự đoán vị trí trong 1 giờ tới, step 5 phút. |
 | `footprint` | `FootprintPoint[]` | Polygon vùng phủ của vệ tinh tại vị trí hiện tại. |
-| `passes` | `PassPrediction[]` | Các lần vệ tinh bay qua Hà Nội trong 24 giờ tới, chỉ tính pass vượt qua minimum elevation. |
+| `passes` | `PassPrediction[]` | Các lần vệ tinh bay qua ground station trong 24 giờ tới, chỉ tính pass vượt qua minimum elevation. |
 
 ## `tle`
 
@@ -119,12 +154,12 @@ type TleRecord = {
 
 | Field | Kiểu | Giải thích |
 | --- | --- | --- |
-| `name` | `string` | Tên hiển thị trong app. Hiện normalize thành `NanoDragon`. |
+| `name` | `string` | Tên hiển thị của vệ tinh, lấy từ `SATELLITE_CATALOG` nếu có. |
 | `line1` | `string` | TLE line 1 được đưa vào `satellite.js` để chạy SGP4. |
 | `line2` | `string` | TLE line 2 được đưa vào `satellite.js` để chạy SGP4. |
 | `source` | `string` | Nguồn TLE, ví dụ `Space-Track.org`, hoặc label fallback nếu dùng TLE dự phòng. |
 | `satId` | `string` | SatNOGS UUID dùng để query vệ tinh. |
-| `noradCatId` | `number \| null` | NORAD catalog field SatNOGS trả về, nếu có. Không dùng làm lookup chính cho NanoDragon. |
+| `noradCatId` | `number \| null` | NORAD catalog field SatNOGS trả về, nếu có. Không dùng làm lookup chính. |
 | `updatedAt` | `string` | Thời điểm TLE upstream được cập nhật. |
 | `isFallback` | `boolean` | `false` nếu lấy live từ SatNOGS. `true` nếu SatNOGS lỗi và app đang dùng TLE fallback đã lưu sẵn. |
 
@@ -307,7 +342,7 @@ TLE + observer lat/lon/alt
 
 - TLE là nguồn dữ liệu chính để tính vị trí, ground track, footprint và pass prediction.
 - Không lấy lat/lon thủ công từ third-party rồi vẽ bừa. Luồng đúng là TLE -> SGP4 -> geodetic.
-- Với NanoDragon, dùng `sat_id` của SatNOGS để query TLE là ổn định nhất.
-- API có fallback TLE để dashboard vẫn render được nếu SatNOGS tạm lỗi.
+- Dùng `sat_id` của SatNOGS để query từng vệ tinh.
+- API hỗ trợ fallback TLE theo từng vệ tinh nếu config có fallback.
 - Tất cả timestamp trong response nội bộ là UTC string.
 - Tọa độ `x/y` trong response được tính cho world map 1440x720 đã chọn.

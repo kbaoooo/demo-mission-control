@@ -41,7 +41,7 @@ Use `chore`, not `chores`.
 Good examples:
 
 ```txt
-feat: add NanoDragon mission dashboard
+feat: add satellite mission dashboard
 fix: split ground track at antimeridian
 docs: document SatNOGS TLE response fields
 build: add satellite propagation dependencies
@@ -62,7 +62,7 @@ fix: fixed bug.
 Add a body only when the commit needs context, tradeoffs, migration notes, or test evidence.
 
 ```txt
-feat: add NanoDragon mission dashboard
+feat: add satellite mission dashboard
 
 Fetches the latest SatNOGS TLE, propagates it with SGP4, and renders current
 position, footprint, ground track, and Hanoi pass predictions.

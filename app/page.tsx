@@ -1,4 +1,5 @@
 import { Activity, Clock3, MapPin, RadioTower, Satellite } from "lucide-react";
+import Link from "next/link";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -25,9 +26,20 @@ import {
   mapPolyline,
   mapSegments,
 } from "@/lib/orbit";
-import { fetchNanoDragonTle, SATNOGS_TLE_URL } from "@/lib/satnogs";
+import {
+  fetchSatelliteTle,
+  getSatelliteConfig,
+  getSatnogsTleUrl,
+  SATELLITE_CATALOG,
+} from "@/lib/satnogs";
 
 export const dynamic = "force-dynamic";
+
+type HomeProps = {
+  searchParams: Promise<{
+    satId?: string | string[];
+  }>;
+};
 
 function formatNumber(value: number, digits = 2) {
   return new Intl.NumberFormat("en-US", {
@@ -53,8 +65,14 @@ function formatTime(value: string) {
   }).format(new Date(value));
 }
 
-export default async function Home() {
-  const tle = await fetchNanoDragonTle();
+function firstSearchValue(value?: string | string[]) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+export default async function Home({ searchParams }: HomeProps) {
+  const params = await searchParams;
+  const selectedSatellite = getSatelliteConfig(firstSearchValue(params.satId));
+  const tle = await fetchSatelliteTle(selectedSatellite.satId);
   const data = buildMissionControlData(tle);
   const groundTrackSegments = mapSegments(data.groundTrack);
   const footprintSegments = mapSegments(data.footprint);
@@ -69,18 +87,22 @@ export default async function Home() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="secondary">Vietnam satellite</Badge>
+              <Badge variant="secondary">Satellite catalog</Badge>
+              {selectedSatellite.country ? (
+                <Badge variant="outline">{selectedSatellite.country}</Badge>
+              ) : null}
               <Badge variant={data.tle.isFallback ? "destructive" : "outline"}>
                 {data.tle.isFallback ? "Fallback TLE" : "Live SatNOGS TLE"}
               </Badge>
             </div>
             <div>
               <h1 className="text-3xl font-semibold tracking-normal sm:text-4xl">
-                NanoDragon Mission Control
+                Satellite Mission Control
               </h1>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
                 TLE from SatNOGS, propagated with SGP4 into current position,
-                ground track, footprint, and Hanoi pass predictions.
+                ground track, footprint, and pass predictions for the selected
+                satellite.
               </p>
             </div>
           </div>
@@ -97,10 +119,38 @@ export default async function Home() {
             <Activity className="size-4" />
             <AlertTitle>SatNOGS live fetch failed</AlertTitle>
             <AlertDescription>
-              The dashboard is using the last verified NanoDragon TLE fallback.
+              The dashboard is using the last verified fallback TLE for{" "}
+              {data.tle.name}.
             </AlertDescription>
           </Alert>
         ) : null}
+
+        <Card className="rounded-lg">
+          <CardHeader>
+            <CardTitle>Configured Satellites</CardTitle>
+            <CardDescription>
+              Select any configured SatNOGS satellite ID without changing the
+              orbit pipeline.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            {SATELLITE_CATALOG.map((satellite) => {
+              const selected = satellite.satId === selectedSatellite.satId;
+
+              return (
+                <Link
+                  key={satellite.satId}
+                  className="rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  href={`/?satId=${encodeURIComponent(satellite.satId)}`}
+                >
+                  <Badge variant={selected ? "default" : "outline"}>
+                    {satellite.name}
+                  </Badge>
+                </Link>
+              );
+            })}
+          </CardContent>
+        </Card>
 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
           <Card className="rounded-lg">
@@ -126,7 +176,7 @@ export default async function Home() {
                 <svg
                   className="absolute inset-0 size-full"
                   viewBox="0 0 1440 720"
-                  aria-label="NanoDragon ground track and footprint"
+                  aria-label="Satellite ground track and footprint"
                   role="img"
                 >
                   {footprintSegments.map((segment, index) => (
@@ -321,13 +371,13 @@ export default async function Home() {
           </Card>
         </div>
 
-        <Card className="rounded-lg">
-          <CardHeader>
-            <CardTitle>TLE Source</CardTitle>
-            <CardDescription>
-              Latest NanoDragon orbital data from SatNOGS DB
-            </CardDescription>
-          </CardHeader>
+          <Card className="rounded-lg">
+            <CardHeader>
+              <CardTitle>TLE Source</CardTitle>
+              <CardDescription>
+                Latest orbital data for the selected satellite from SatNOGS DB
+              </CardDescription>
+            </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-3 text-sm md:grid-cols-4">
               <Metric label="Satellite" value={data.tle.name} />
@@ -344,7 +394,7 @@ export default async function Home() {
             </pre>
             <a
               className="text-sm font-medium text-primary underline-offset-4 hover:underline"
-              href={SATNOGS_TLE_URL}
+              href={getSatnogsTleUrl(data.tle.satId)}
               target="_blank"
               rel="noreferrer"
             >
